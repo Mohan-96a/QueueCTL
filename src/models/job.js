@@ -69,10 +69,61 @@ function getJobCountsByState() {
   return counts;
 }
 
+function claimNextJob() {
+  const db = getDatabase();
+
+  return db.transaction(() => {
+    const job = db.prepare(`
+      SELECT * FROM jobs
+      WHERE state = 'pending'
+      ORDER BY created_at ASC
+      LIMIT 1
+    `).get();
+
+    if (!job) {
+      return null;
+    }
+
+    const timestamp = nowIso();
+    const result = db.prepare(`
+      UPDATE jobs
+      SET state = 'processing', updated_at = ?
+      WHERE id = ? AND state = 'pending'
+    `).run(timestamp, job.id);
+
+    if (result.changes === 0) {
+      return null;
+    }
+
+    return getJobById(job.id);
+  })();
+}
+
+function completeJob(id) {
+  const db = getDatabase();
+  db.prepare(`
+    UPDATE jobs
+    SET state = 'completed', updated_at = ?
+    WHERE id = ?
+  `).run(nowIso(), id);
+}
+
+function failJob(id) {
+  const db = getDatabase();
+  db.prepare(`
+    UPDATE jobs
+    SET state = 'failed', updated_at = ?
+    WHERE id = ?
+  `).run(nowIso(), id);
+}
+
 module.exports = {
   VALID_STATES,
   createJob,
   getJobById,
   listJobs,
   getJobCountsByState,
+  claimNextJob,
+  completeJob,
+  failJob,
 };

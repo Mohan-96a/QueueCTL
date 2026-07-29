@@ -22,6 +22,7 @@ CREATE TABLE IF NOT EXISTS workers (
 
 CREATE INDEX IF NOT EXISTS idx_jobs_state ON jobs(state);
 CREATE INDEX IF NOT EXISTS idx_jobs_created_at ON jobs(created_at);
+CREATE INDEX IF NOT EXISTS idx_workers_status ON workers(status);
 `;
 
 module.exports = { SCHEMA_SQL };

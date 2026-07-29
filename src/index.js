@@ -5,9 +5,11 @@ const { getDatabase, closeDatabase } = require('./db/database');
 const { enqueueCommand } = require('./commands/enqueue');
 const { statusCommand } = require('./commands/status');
 const { listCommand } = require('./commands/list');
+const { workerStart } = require('./commands/worker-start');
+const { workerStop } = require('./commands/worker-stop');
 
 function handleError(error) {
-  if (error.code === 'MISSING_COMMAND' || error.code === 'INVALID_STATE') {
+  if (error.code === 'MISSING_COMMAND' || error.code === 'INVALID_STATE' || error.code === 'INVALID_COUNT') {
     console.error(`Error: ${error.message}`);
     process.exitCode = 1;
     return;
@@ -17,7 +19,7 @@ function handleError(error) {
   process.exitCode = 1;
 }
 
-function run() {
+async function run() {
   getDatabase();
 
   const program = new Command();
@@ -52,13 +54,32 @@ function run() {
       listCommand(options);
     });
 
-  program.parse(process.argv);
+  const worker = program
+    .command('worker')
+    .description('Manage background workers');
+
+  worker
+    .command('start')
+    .description('Start worker process(es) to execute pending jobs')
+    .option('--count <n>', 'Number of worker processes to start', '1')
+    .action(async (options) => {
+      await workerStart(options);
+    });
+
+  worker
+    .command('stop')
+    .description('Gracefully stop all active workers via SIGTERM')
+    .action(async () => {
+      await workerStop();
+    });
+
+  await program.parseAsync(process.argv);
 }
 
-try {
-  run();
-} catch (error) {
-  handleError(error);
-} finally {
-  closeDatabase();
-}
+run()
+  .catch((error) => {
+    handleError(error);
+  })
+  .finally(() => {
+    closeDatabase();
+  });
